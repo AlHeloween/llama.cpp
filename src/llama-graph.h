@@ -18,6 +18,9 @@ struct ggml_tensor;
 
 struct llama_cparams;
 
+// Aurora compute reduction integration
+struct llama_aurora_context_params;
+
 struct llama_memory_context_i;
 
 class llama_kv_cache_context;
@@ -465,6 +468,9 @@ struct llm_graph_params {
 
     llm_graph_result * res;
 
+    // Aurora compute reduction integration
+    struct llama_aurora_context_params* aurora_params = nullptr;
+
     // return true if the "other" params would result in a graph with the same topology as with the current params
     //   having the same topology allows us to reuse the graph in some cases
     bool allow_reuse(const llm_graph_params & other) const {
@@ -657,6 +663,9 @@ struct llm_graph_context {
 
     ggml_context * ctx0 = nullptr;
     ggml_cgraph  * gf   = nullptr;
+
+    // Aurora compute reduction integration
+    const struct llama_aurora_context_params* aurora_params = nullptr;
 
     llm_graph_context(const llm_graph_params & params);
     virtual ~llm_graph_context() = default;

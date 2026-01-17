@@ -8,8 +8,12 @@
 #include "llama-mmap.h"
 #include "llama-model.h"
 
+// Aurora compute reduction integration
+#include "../../../include/llama-aurora-integration.h"
+
 #include <cinttypes>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -361,6 +365,13 @@ llama_context::llama_context(
 }
 
 llama_context::~llama_context() {
+    // Cleanup Aurora params
+    if (aurora_params) {
+        // Note: Don't free memory_banks here - they're managed externally
+        delete aurora_params;
+        aurora_params = nullptr;
+    }
+
     if (!model.hparams.no_alloc) {
         for (size_t i = 0; i < backend_ptrs.size(); ++i) {
             ggml_backend_t             backend = backend_ptrs[i];
@@ -1178,6 +1189,16 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         LLAMA_LOG_ERROR("%s: failed to compute graph, compute status: %d\n", __func__, status);
         ret = status;
         return nullptr;
+    }
+
+    // Aurora post-forward hook (after computation, before KV update)
+    if (aurora_params && aurora_params->enable_memory_write && res) {
+        // Extract current hidden state for memory write
+        // Use embeddings tensor as hidden state representation
+        auto * t_embd = res->get_embd_pooled() ? res->get_embd_pooled() : res->get_embd();
+        // Note: In practice, we'd extract the actual generated token text here
+        // For now, we'll call the hook with NULL text (memory write can be deferred)
+        llama_aurora_post_forward_hook(this, t_embd, ubatch.n_tokens > 0 ? ubatch.n_tokens - 1 : 0, nullptr, aurora_params);
     }
 
     ret = GGML_STATUS_SUCCESS;
@@ -2133,6 +2154,7 @@ llm_graph_params llama_context::graph_params(
         /*.n_outputs   =*/ n_outputs,
         /*.cb          =*/ graph_get_cb(),
         /*.res         =*/ res,
+        /*.aurora_params =*/ aurora_params,
     };
 }
 
@@ -3075,6 +3097,53 @@ llama_context * llama_init_from_model(
 
     try {
         auto * ctx = new llama_context(*model, params);
+
+        // Initialize Aurora params (default: disabled)
+        ctx->aurora_params = nullptr;
+
+        // Check environment variable to enable Navigation paradigm (Stage 4)
+        const char* enable_aurora = getenv("AURORA_ENABLE_NAVIGATION");
+        if (enable_aurora && (strcmp(enable_aurora, "1") == 0 || strcmp(enable_aurora, "true") == 0)) {
+            ctx->aurora_params = new llama_aurora_context_params();
+            llama_aurora_context_params_init(ctx->aurora_params);
+            ctx->aurora_params->enable_aurora_memory = true;
+            ctx->aurora_params->enable_navigation_paradigm = true;
+
+            // Read Navigation paradigm parameters from environment variables
+            const char* nav_tau_str = getenv("AURORA_NAV_TAU");
+            if (nav_tau_str) {
+                ctx->aurora_params->nav_tau = (float)atof(nav_tau_str);
+            }
+
+            const char* nav_max_depth_str = getenv("AURORA_NAV_MAX_DEPTH");
+            if (nav_max_depth_str) {
+                ctx->aurora_params->nav_max_depth = (int32_t)atoi(nav_max_depth_str);
+            }
+
+            const char* nav_max_nodes_str = getenv("AURORA_NAV_MAX_NODES");
+            if (nav_max_nodes_str) {
+                ctx->aurora_params->nav_max_nodes_per_level = (int32_t)atoi(nav_max_nodes_str);
+            }
+
+            const char* window_size_str = getenv("AURORA_WINDOW_SIZE");
+            if (window_size_str) {
+                ctx->aurora_params->aurora_window_size = (int32_t)atoi(window_size_str);
+            }
+
+            const char* k_read_str = getenv("AURORA_K_READ");
+            if (k_read_str) {
+                ctx->aurora_params->aurora_k_read = (int32_t)atoi(k_read_str);
+            }
+
+            LLAMA_LOG_INFO("%s: Aurora Navigation paradigm ENABLED (tau=%.3f, max_depth=%d, max_nodes=%d, window=%d, k_read=%d)\n",
+                __func__,
+                ctx->aurora_params->nav_tau,
+                ctx->aurora_params->nav_max_depth,
+                ctx->aurora_params->nav_max_nodes_per_level,
+                ctx->aurora_params->aurora_window_size,
+                ctx->aurora_params->aurora_k_read);
+        }
+
         return ctx;
     } catch (const std::exception & err) {
         LLAMA_LOG_ERROR("%s: failed to initialize the context: %s\n", __func__, err.what());

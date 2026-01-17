@@ -9,6 +9,9 @@
 #include "llama-memory-hybrid.h"
 #include "llama-memory-recurrent.h"
 
+// Aurora compute reduction integration
+#include "../../../include/llama-aurora-integration.h"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
@@ -712,7 +715,8 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     cb_func          (params.cb),
     res              (params.res),
     ctx0             (res->get_ctx()),
-    gf               (res->get_gf()) {
+    gf               (res->get_gf()),
+    aurora_params    (params.aurora_params) {
         res->set_params(params);
     }
 
@@ -1503,9 +1507,27 @@ ggml_tensor * llm_graph_context::build_attn_mha(
             v = ggml_cast(ctx0, v, GGML_TYPE_F16);
         }
 
-        cur = ggml_flash_attn_ext(ctx0, q, k, v, kq_mask, kq_scale, hparams.f_max_alibi_bias,
-                                  hparams.attn_soft_cap ? hparams.f_attn_logit_softcapping : 0.0f);
-        cb(cur, LLAMA_TENSOR_NAME_FATTN, il);
+        // Aurora compute reduction integration
+        if (aurora_params && aurora_params->enable_aurora_memory) {
+            // Note: Pre-attention hook for dual-complex mode is called in build_attn() functions
+            // where q_cur (hidden state before Q projection) is available.
+            // Use Aurora bounded window attention
+            struct ggml_tensor* aurora_attn = llama_aurora_attention_hook(ctx0, q, k, v, aurora_params);
+            if (aurora_attn) {
+                cur = aurora_attn;
+                cb(cur, LLAMA_TENSOR_NAME_FATTN, il);
+            } else {
+                // Fallback to standard attention if Aurora hook returns NULL
+                cur = ggml_flash_attn_ext(ctx0, q, k, v, kq_mask, kq_scale, hparams.f_max_alibi_bias,
+                                          hparams.attn_soft_cap ? hparams.f_attn_logit_softcapping : 0.0f);
+                cb(cur, LLAMA_TENSOR_NAME_FATTN, il);
+            }
+        } else {
+            // Standard attention path
+            cur = ggml_flash_attn_ext(ctx0, q, k, v, kq_mask, kq_scale, hparams.f_max_alibi_bias,
+                                      hparams.attn_soft_cap ? hparams.f_attn_logit_softcapping : 0.0f);
+            cb(cur, LLAMA_TENSOR_NAME_FATTN, il);
+        }
 
         ggml_flash_attn_ext_add_sinks(cur, sinks);
         ggml_flash_attn_ext_set_prec (cur, GGML_PREC_F32);
@@ -1649,6 +1671,21 @@ ggml_tensor * llm_graph_context::build_attn(
     //       but it might not be worth it: https://github.com/ggml-org/llama.cpp/pull/15636
     //assert(!ubatch.equal_seqs() || (k_cur->ne[3] == 1 && k_cur->ne[3] == ubatch.n_seqs_unq));
 
+    // Aurora compute reduction integration - pre-attention hook for dual-complex mode
+    if (aurora_params && aurora_params->enable_aurora_memory && aurora_params->use_dual_complex) {
+        // Call pre-attention hook for memory retrieval (dual-complex mode)
+        // q_cur is the hidden state before Q projection
+        int32_t token_idx = n_tokens - 1;  // Last token
+        struct ggml_tensor* memory_embeddings = llama_aurora_pre_attention_hook_dual_complex(
+            ctx0,
+            q_cur,  // Primal hidden state (before Q projection)
+            NULL,   // Dual component (NULL for now - would be extracted if available)
+            token_idx,
+            aurora_params
+        );
+        // Memory embeddings are stored in params for use in attention hook
+    }
+
     ggml_tensor * q = q_cur;
     ggml_tensor * k = k_cur;
     ggml_tensor * v = v_cur;
@@ -1739,6 +1776,21 @@ ggml_tensor * llm_graph_context::build_attn(
 
     const auto & kq_mask = inp->get_kq_mask();
 
+    // Aurora compute reduction integration - pre-attention hook for dual-complex mode
+    if (aurora_params && aurora_params->enable_aurora_memory && aurora_params->use_dual_complex) {
+        // Call pre-attention hook for memory retrieval (dual-complex mode)
+        // q_cur is the hidden state before Q projection
+        int32_t token_idx = n_tokens - 1;  // Last token
+        struct ggml_tensor* memory_embeddings = llama_aurora_pre_attention_hook_dual_complex(
+            ctx0,
+            q_cur,  // Primal hidden state (before Q projection)
+            NULL,   // Dual component (NULL for now - would be extracted if available)
+            token_idx,
+            aurora_params
+        );
+        // Memory embeddings are stored in params for use in attention hook
+    }
+
     ggml_tensor * q = q_cur;
     ggml_tensor * k = mctx_cur->get_k(ctx0, il);
     ggml_tensor * v = mctx_cur->get_v(ctx0, il);
@@ -1806,6 +1858,21 @@ ggml_tensor * llm_graph_context::build_attn(
 
     const auto & kq_mask = is_swa ? inp->get_kq_mask_swa() : inp->get_kq_mask();
 
+    // Aurora compute reduction integration - pre-attention hook for dual-complex mode
+    if (aurora_params && aurora_params->enable_aurora_memory && aurora_params->use_dual_complex) {
+        // Call pre-attention hook for memory retrieval (dual-complex mode)
+        // q_cur is the hidden state before Q projection
+        int32_t token_idx = n_tokens - 1;  // Last token
+        struct ggml_tensor* memory_embeddings = llama_aurora_pre_attention_hook_dual_complex(
+            ctx0,
+            q_cur,  // Primal hidden state (before Q projection)
+            NULL,   // Dual component (NULL for now - would be extracted if available)
+            token_idx,
+            aurora_params
+        );
+        // Memory embeddings are stored in params for use in attention hook
+    }
+
     ggml_tensor * q = q_cur;
     ggml_tensor * k = mctx_cur->get_k(ctx0, il);
     ggml_tensor * v = mctx_cur->get_v(ctx0, il);
@@ -1860,6 +1927,21 @@ ggml_tensor * llm_graph_context::build_attn(
     ggml_build_forward_expand(gf, v_cur);
 
     const auto & kq_mask = inp->get_kq_mask_cross();
+
+    // Aurora compute reduction integration - pre-attention hook for dual-complex mode
+    if (aurora_params && aurora_params->enable_aurora_memory && aurora_params->use_dual_complex) {
+        // Call pre-attention hook for memory retrieval (dual-complex mode)
+        // q_cur is the hidden state before Q projection
+        int32_t token_idx = n_tokens - 1;  // Last token
+        struct ggml_tensor* memory_embeddings = llama_aurora_pre_attention_hook_dual_complex(
+            ctx0,
+            q_cur,  // Primal hidden state (before Q projection)
+            NULL,   // Dual component (NULL for now - would be extracted if available)
+            token_idx,
+            aurora_params
+        );
+        // Memory embeddings are stored in params for use in attention hook
+    }
 
     ggml_tensor * q = q_cur;
     ggml_tensor * k = k_cur;
