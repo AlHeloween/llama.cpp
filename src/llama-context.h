@@ -370,8 +370,4 @@ private:
     mutable int32_t n_eval   = 0; // number of eval calls
 
     mutable int32_t n_reused = 0; // number of times the previous graph was reused
-
-    // Aurora compute reduction integration
-    struct llama_aurora_context_params* aurora_params = nullptr;
-
-private:
+};

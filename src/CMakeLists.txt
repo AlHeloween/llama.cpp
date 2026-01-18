@@ -139,6 +139,34 @@ add_library(llama
             models/xverse.cpp
             models/mistral3.cpp
             models/graph-context-mamba.cpp
+            # Aurora sources (for compute reduction integration)
+            ../../../src/llama-aurora-integration.cpp
+            ../../../src/llama-aurora-attention.cpp
+            ../../../src/llama-aurora-navigation.cpp
+            ../../../src/ggml-aurora-memory.cpp
+            ../../../src/aurora_memory_bank.cpp
+            # Dual complex and dual quaternion operations
+            ../../../src/ggml-dual-complex.cpp
+            ../../../src/ggml-dual-quaternion.cpp
+            ../../../src/ggml-dq-linear.cpp
+            ../../../src/ggml-dq-attention.cpp
+            # Probe encoder and FFE quantization
+            ../../../src/probe-encoder.cpp
+            ../../../src/ggml-ffe-quantization.cpp
+            # Lattice operations
+            ../../../src/ggml-lattice-addressing.cpp
+            ../../../src/ggml-lattice-storage.cpp
+            ../../../src/ggml-probe-to-lattice.cpp
+            # Transcender and evolution
+            ../../../src/ggml-transcender.cpp
+            ../../../src/ggml-screw-theory.cpp
+            ../../../src/ggml-temporal-evolution.cpp
+            # GPU metrics
+            ../../../src/ggml-gpu-metrics.cpp
+            ../../../src/genesis_metrics.cpp
+            # Aurora artifacts (CUDA functions)
+            ../../../src/aurora_artifacts.cpp
+            # CUDA kernels (if CUDA is available)
             )
 
 set_target_properties(llama PROPERTIES
@@ -148,10 +176,26 @@ set_target_properties(llama PROPERTIES
 )
 
 target_include_directories(llama PRIVATE .)
-target_include_directories(llama PUBLIC ../include)
+target_include_directories(llama PUBLIC 
+    ../include
+    ../../../include  # Aurora headers
+    ../../../3rdparty/llama.cpp/ggml/include  # GGML headers
+    ../../../../lib  # Math headers (math_dualQuat.h, etc.)
+)
 target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 
 target_link_libraries(llama PUBLIC ggml)
+
+# Add CUDA include directories and libraries if CUDA is available
+# Aurora sources use CUDA functions, so we need to link CUDA libraries
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+    target_include_directories(llama PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+    # Link CUDA runtime and curand libraries for Aurora CUDA functions
+    target_link_libraries(llama PUBLIC CUDA::cudart CUDA::curand)
+    # Note: CUDA kernels (ggml-dq-linear-cuda.cu, etc.) are compiled via aurora_artifacts.cpp
+    # which should contain the CUDA kernel function implementations
+endif()
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)
