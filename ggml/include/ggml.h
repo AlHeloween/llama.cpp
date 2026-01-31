@@ -423,9 +423,12 @@ extern "C" {
         // GGML_TYPE_Q4_0_8_8 = 33,
         GGML_TYPE_TQ1_0   = 34,
         GGML_TYPE_TQ2_0   = 35,
-        // GGML_TYPE_IQ4_NL_4_4 = 36,
-        // GGML_TYPE_IQ4_NL_4_8 = 37,
-        // GGML_TYPE_IQ4_NL_8_8 = 38,
+        // NOTE (BitNet): type id 36 is used by BitNet-b1.58 GGUF models as "i2_s" (2 bpw ternary).
+        // Upstream llama.cpp previously used 36-38 for removed repacking types. For this BitNet fork,
+        // we reassign these ids to preserve GGUF compatibility.
+        GGML_TYPE_I2_S    = 36,
+        GGML_TYPE_I8_S    = 37,
+        // 38 remains reserved (previously IQ4_NL_8_8 REMOVED).
         GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
         GGML_TYPE_COUNT   = 40,
     };

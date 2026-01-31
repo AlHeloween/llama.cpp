@@ -514,8 +514,13 @@ enum llm_tensor_layer {
 
 struct LLM_KV {
     LLM_KV(llm_arch arch, const char * suffix = nullptr);
+    // Optional override for the architecture prefix used in GGUF KV names.
+    // Example: BitNet-b1.58 GGUF files store keys under "bitnet-b1.58.*" while the
+    // canonical arch name for LLM_ARCH_BITNET is "bitnet".
+    LLM_KV(llm_arch arch, std::string arch_name_override, const char * suffix = nullptr);
 
     llm_arch arch;
+    std::string arch_name_override;
     const char * suffix;
 
     std::string operator()(llm_kv kv) const;

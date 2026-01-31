@@ -2491,10 +2491,20 @@ static const std::map<llm_tensor, llm_tensor_info> LLM_TENSOR_INFOS = {
     {LLM_TENSOR_NEXTN_SHARED_HEAD_NORM,     {LLM_TENSOR_LAYER_OUTPUT, GGML_OP_MUL}},
 };
 
-LLM_KV::LLM_KV(llm_arch arch, const char * suffix) : arch(arch), suffix(suffix) {}
+LLM_KV::LLM_KV(llm_arch arch, const char * suffix) : arch(arch), arch_name_override(), suffix(suffix) {}
+
+LLM_KV::LLM_KV(llm_arch arch, std::string arch_name_override, const char * suffix)
+    : arch(arch), arch_name_override(std::move(arch_name_override)), suffix(suffix) {}
 
 std::string LLM_KV::operator()(llm_kv kv) const {
-    std::string name = ::format(LLM_KV_NAMES.at(kv), LLM_ARCH_NAMES.at(arch));
+    const char * arch_name = nullptr;
+    if (!arch_name_override.empty()) {
+        arch_name = arch_name_override.c_str();
+    } else {
+        arch_name = LLM_ARCH_NAMES.at(arch);
+    }
+
+    std::string name = ::format(LLM_KV_NAMES.at(kv), arch_name);
 
     if (suffix != nullptr) {
         name += ".";
@@ -2535,6 +2545,12 @@ const char * llm_arch_name(llm_arch arch) {
 }
 
 llm_arch llm_arch_from_string(const std::string & name) {
+    // BitNet-b1.58 GGUF files use "bitnet-b1.58" as the architecture string, but the
+    // runtime implementation lives under LLM_ARCH_BITNET. We treat this as an alias.
+    if (name == "bitnet-b1.58") {
+        return LLM_ARCH_BITNET;
+    }
+
     for (const auto & kv : LLM_ARCH_NAMES) { // NOLINT
         if (kv.second == name) {
             return kv.first;

@@ -534,7 +534,9 @@ llama_model_loader::llama_model_loader(
     }
 
     get_key(llm_kv(LLM_KV_GENERAL_ARCHITECTURE), arch_name, false);
-    llm_kv = LLM_KV(llm_arch_from_string(arch_name));
+    // Use the file's architecture string as the KV prefix (e.g. "bitnet-b1.58")
+    // even when the runtime arch enum is a canonical alias (e.g. LLM_ARCH_BITNET -> "bitnet").
+    llm_kv = LLM_KV(llm_arch_from_string(arch_name), arch_name);
 
     files.emplace_back(new llama_file(fname.c_str(), "rb", use_direct_io));
     contexts.emplace_back(ctx);
