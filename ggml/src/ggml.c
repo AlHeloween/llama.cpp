@@ -880,9 +880,10 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
     },
     [GGML_TYPE_I2_S] = {
         .type_name                = "i2_s",
-        .blck_size                = 1,
+        .blck_size                = 4,
         .type_size                = sizeof(int8_t),
         .is_quantized             = true,
+        .to_float                 = (ggml_to_float_t) dequantize_row_i2_s,
     },
     [GGML_TYPE_I8_S] = {
         .type_name                = "i8_s",
@@ -1261,6 +1262,12 @@ size_t ggml_nbytes(const struct ggml_tensor * tensor) {
         nbytes = tensor->ne[0]*tensor->nb[0]/blck_size;
         for (int i = 1; i < GGML_MAX_DIMS; ++i) {
             nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
+        }
+        /* BitNet I2_S: packed 2-bit ternary; backing buffer size = elements/4 + 32 */
+        if (tensor->type == GGML_TYPE_I2_S) {
+            size_t nel = 1;
+            for (int i = 0; i < GGML_MAX_DIMS; ++i) nel *= tensor->ne[i];
+            nbytes = nel / 4 + 32;
         }
     }
 

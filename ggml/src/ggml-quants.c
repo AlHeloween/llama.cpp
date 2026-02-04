@@ -414,6 +414,20 @@ void dequantize_row_q8_0(const block_q8_0 * GGML_RESTRICT x, float * GGML_RESTRI
     }
 }
 
+/* BitNet I2_S: 2-bit ternary, 4 values per byte. 00=-1, 01=0, 10=+1, 11=0. k must be multiple of 4. */
+void dequantize_row_i2_s(const void * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
+    assert(k >= 0 && (k % 4) == 0);
+    const uint8_t * GGML_RESTRICT q = (const uint8_t *)x;
+    static const float tbl[4] = { -1.f, 0.f, 1.f, 0.f };
+    for (int64_t i = 0; i < k; i += 4) {
+        const uint8_t b = *q++;
+        y[i + 0] = tbl[(b >> 0) & 3];
+        y[i + 1] = tbl[(b >> 2) & 3];
+        y[i + 2] = tbl[(b >> 4) & 3];
+        y[i + 3] = tbl[(b >> 6) & 3];
+    }
+}
+
 void dequantize_row_mxfp4(const block_mxfp4 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
     static const int qk = QK_MXFP4;
 

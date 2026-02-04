@@ -731,6 +731,7 @@ ggml_tensor * llm_graph_context::build_cvec(
 ggml_tensor * llm_graph_context::build_lora_mm(
           ggml_tensor * w,
           ggml_tensor * cur) const {
+    // BitNet I2_S: CUDA has fused add/sub/skip kernel (MUL_MAT I2_S×F32). No cast; graph uses MUL_MAT(w, cur) directly.
     ggml_tensor * res = ggml_mul_mat(ctx0, w, cur);
 
     for (const auto & lora : *loras) {

@@ -2,6 +2,8 @@
 #include "ggml-impl.h"
 #include "ggml-backend-impl.h"
 
+#include <fstream>
+
 #include "ggml-cuda/common.cuh"
 #include "ggml-cuda/acc.cuh"
 #include "ggml-cuda/add-id.cuh"
@@ -26,6 +28,7 @@
 #include "ggml-cuda/getrows.cuh"
 #include "ggml-cuda/im2col.cuh"
 #include "ggml-cuda/mmf.cuh"
+#include "ggml-cuda/mmi2s.cuh"
 #include "ggml-cuda/mmq.cuh"
 #include "ggml-cuda/mmvf.cuh"
 #include "ggml-cuda/mmvq.cuh"
@@ -2146,6 +2149,11 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
     ggml_tensor *       src1 = tensor->src[1];
     const ggml_tensor * dst  = tensor;
 
+    // BitNet I2_S: no vec path in mmvq.cu; use full MUL_MAT (ggml_cuda_mul_mat_i2_s) only.
+    if (src0->type == GGML_TYPE_I2_S) {
+        return false;
+    }
+
     const bool bad_padding_clear = ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE &&
                                    ggml_nbytes(src0) != ggml_backend_buffer_get_alloc_size(src0->buffer, src0) &&
                                    src0->view_src;
@@ -2182,6 +2190,12 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
 static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     const bool split = ggml_backend_buft_is_cuda_split(src0->buffer->buft);
 
+    // BitNet I2_S: fused add/sub/skip kernel (no dequant to F32). Single-device only.
+    if (!split && src0->type == GGML_TYPE_I2_S && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+        ggml_cuda_mul_mat_i2_s(ctx, src0, src1, dst);
+        return;
+    }
+
     // If src0 is a temporary compute buffer it may have some padding that needs to be cleared for mul_mat_vec_q or mul_mat_q.
     // But if src0 is also a view of another tensor then this cannot be done safely because it may overwrite valid tensor data.
     // Therefore, in such cases use cuBLAS.
@@ -2192,7 +2206,8 @@ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor
         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32;
     bool use_mul_mat_f     = !ggml_is_quantized(src0->type)
         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32;
-    bool use_mul_mat_vec_q = ggml_is_quantized(src0->type) && !bad_padding_clear
+    // BitNet I2_S: mmvq.cu has no I2_S case; use full MUL_MAT (ggml_cuda_mul_mat_i2_s) only (early return above).
+    bool use_mul_mat_vec_q = ggml_is_quantized(src0->type) && src0->type != GGML_TYPE_I2_S && !bad_padding_clear
         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32
         && src1->ne[1] <= MMVQ_MAX_BATCH_SIZE;
     bool use_mul_mat_q     = ggml_is_quantized(src0->type) && !bad_padding_clear
@@ -2279,12 +2294,29 @@ static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * 
 
     if (src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
         if (ne2 == 1) {
-            if (ggml_is_quantized(src0->type)) {
-                ggml_cuda_mul_mat_vec_q(ctx, src0, src1, ids, dst);
-            } else {
-                ggml_cuda_mul_mat_vec_f(ctx, src0, src1, ids, dst);
+            static bool s_logged_mul_mat_id_vec = false;
+            if (!s_logged_mul_mat_id_vec) {
+                s_logged_mul_mat_id_vec = true;
+                GGML_LOG_INFO(
+                    "%s: MUL_MAT_ID vec fast-path candidate: src0->type=%s(%d) src1->type=%s(%d) dst->type=%s(%d) ne2=%" PRId64 "\n",
+                    __func__,
+                    ggml_type_name(src0->type), (int) src0->type,
+                    ggml_type_name(src1->type), (int) src1->type,
+                    ggml_type_name(dst->type),  (int) dst->type,
+                    ne2);
             }
-            return;
+
+            // BitNet I2_S: must NOT enter mmvq (ggml_cuda_mul_mat_vec_q). Use the slower generic path below
+            // (which ultimately routes to the correct kernel/backend) instead.
+            if (ggml_is_quantized(src0->type) && src0->type != GGML_TYPE_I2_S) {
+                ggml_cuda_mul_mat_vec_q(ctx, src0, src1, ids, dst);
+                return;
+            }
+
+            if (!ggml_is_quantized(src0->type)) {
+                ggml_cuda_mul_mat_vec_f(ctx, src0, src1, ids, dst);
+                return;
+            }
         }
 
         if (ggml_cuda_should_use_mmq(src0->type, cc, ne12, /*n_experts=*/ne02)) {
@@ -4416,6 +4448,8 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                     case GGML_TYPE_IQ4_XS:
                     case GGML_TYPE_BF16:
                         return true;
+                    case GGML_TYPE_I2_S:
+                        return b->type == GGML_TYPE_F32;
                     default:
                         return false;
                 }
@@ -4517,6 +4551,10 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
         case GGML_OP_DUP:
             {
                 ggml_type src0_type = op->src[0]->type;
+                // BitNet I2_S: no CUDA dequant; DUP I2_S->F32 must run on CPU (uses to_float).
+                if (src0_type == GGML_TYPE_I2_S) {
+                    return false;
+                }
                 return src0_type != GGML_TYPE_I32 && src0_type != GGML_TYPE_I16;
             } break;
         case GGML_OP_ARGMAX:

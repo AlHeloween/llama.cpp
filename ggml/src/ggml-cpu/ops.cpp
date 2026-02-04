@@ -483,6 +483,11 @@ static void ggml_compute_forward_dup_from_q(
     const ggml_type type = src0->type;
     ggml_to_float_t const dequantize_row_q = ggml_get_type_traits(type)->to_float;
 
+    if (dequantize_row_q == NULL) {
+        GGML_ABORT("DUP from quantized type %s to F32 not supported (no to_float); e.g. BitNet I2_S requires a dequantize_row_i2_s or graph change",
+                   ggml_type_name(type));
+    }
+
     size_t qk = ggml_blck_size(type);
     const int64_t nr = ggml_nelements(src1) / qk;
 

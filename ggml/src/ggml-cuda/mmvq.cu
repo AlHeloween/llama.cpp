@@ -596,6 +596,9 @@ static void mul_mat_vec_q_switch_type(
                  nchannels_x, nchannels_y, nchannels_dst, stride_channel_x, stride_channel_y, stride_channel_dst,
                  nsamples_x, nsamples_dst, stride_sample_x, stride_sample_y, stride_sample_dst, stream);
             break;
+        case GGML_TYPE_I2_S:
+            GGML_ABORT("I2_S must use full MUL_MAT; ensure ggml-cuda.cu excludes I2_S from vec path and rebuild");
+            break;
         default:
             GGML_ABORT("fatal error");
             break;
