@@ -1250,24 +1250,16 @@ size_t ggml_nbytes(const struct ggml_tensor * tensor) {
         for (int i = 0; i < GGML_MAX_DIMS; ++i) {
             nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
         }
-        // BitNet GGUF compatibility: I2_S tensors are stored packed (2 bits/weight, ternary)
-        // with a small per-tensor footer. The "logical" strides (nb*) are computed as if the
-        // tensor were unpacked; callers that consume the packed data must divide the relevant
-        // strides by 4 when indexing. Here we size the backing buffer to the packed layout.
-        if (tensor->type == GGML_TYPE_I2_S) {
-            nbytes = nbytes / 4 + 32;
-        }
     }
     else {
         nbytes = tensor->ne[0]*tensor->nb[0]/blck_size;
         for (int i = 1; i < GGML_MAX_DIMS; ++i) {
             nbytes += (tensor->ne[i] - 1)*tensor->nb[i];
         }
-        /* BitNet I2_S: packed 2-bit ternary; backing buffer size = elements/4 + 32 */
+        // BitNet I2_S stores a trailing scale + padding footer. Keep the stride-based
+        // byte calculation above (it may include alignment/padding) and add the footer.
         if (tensor->type == GGML_TYPE_I2_S) {
-            size_t nel = 1;
-            for (int i = 0; i < GGML_MAX_DIMS; ++i) nel *= tensor->ne[i];
-            nbytes = nel / 4 + 32;
+            nbytes += 32;
         }
     }
 

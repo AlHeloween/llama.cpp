@@ -2190,8 +2190,8 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
 static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
     const bool split = ggml_backend_buft_is_cuda_split(src0->buffer->buft);
 
-    // BitNet I2_S: fused add/sub/skip kernel (no dequant to F32). Single-device only.
-    if (!split && src0->type == GGML_TYPE_I2_S && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32) {
+    // BitNet I2_S: packed kernel with activation quantization + correction term. Single-device only.
+    if (!split && src0->type == GGML_TYPE_I2_S && (src1->type == GGML_TYPE_F32 || src1->type == GGML_TYPE_F16) && dst->type == GGML_TYPE_F32) {
         ggml_cuda_mul_mat_i2_s(ctx, src0, src1, dst);
         return;
     }
@@ -4406,7 +4406,8 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                         return false;
                     }
                 }
-                if (b->type == GGML_TYPE_F16 && a->type != GGML_TYPE_F16) {
+                // BitNet I2_S: allow I2_S × F16 → F32 (handled by ggml_cuda_mul_mat_i2_s).
+                if (b->type == GGML_TYPE_F16 && a->type != GGML_TYPE_F16 && a->type != GGML_TYPE_I2_S) {
                     return false;
                 }
 #ifdef GGML_USE_MUSA
@@ -4449,7 +4450,7 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                     case GGML_TYPE_BF16:
                         return true;
                     case GGML_TYPE_I2_S:
-                        return b->type == GGML_TYPE_F32;
+                        return b->type == GGML_TYPE_F32 || b->type == GGML_TYPE_F16;
                     default:
                         return false;
                 }
