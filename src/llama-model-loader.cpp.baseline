@@ -47,10 +47,9 @@ static std::string llama_model_ftype_name(llama_ftype ftype) {
         case LLAMA_FTYPE_MOSTLY_Q5_K_S:   return "Q5_K - Small";
         case LLAMA_FTYPE_MOSTLY_Q5_K_M:   return "Q5_K - Medium";
         case LLAMA_FTYPE_MOSTLY_Q6_K:     return "Q6_K";
-case LLAMA_FTYPE_MOSTLY_TQ1_0:    return "TQ1_0 - 1.69 bpw ternary";
-case LLAMA_FTYPE_MOSTLY_TQ2_0:    return "TQ2_0 - 2.06 bpw ternary";
-case LLAMA_FTYPE_MOSTLY_I2_S:     return "I2_S - 2 bpw ternary";
-case LLAMA_FTYPE_MOSTLY_IQ2_XXS:  return "IQ2_XXS - 2.0625 bpw";
+        case LLAMA_FTYPE_MOSTLY_TQ1_0:    return "TQ1_0 - 1.69 bpw ternary";
+        case LLAMA_FTYPE_MOSTLY_TQ2_0:    return "TQ2_0 - 2.06 bpw ternary";
+        case LLAMA_FTYPE_MOSTLY_IQ2_XXS:  return "IQ2_XXS - 2.0625 bpw";
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:   return "IQ2_XS - 2.3125 bpw";
         case LLAMA_FTYPE_MOSTLY_IQ2_S:    return "IQ2_S - 2.5 bpw";
         case LLAMA_FTYPE_MOSTLY_IQ2_M:    return "IQ2_M - 2.7 bpw";
@@ -702,9 +701,8 @@ llama_model_loader::llama_model_loader(
             case GGML_TYPE_Q5_K:    ftype = LLAMA_FTYPE_MOSTLY_Q5_K_M;  break;
             case GGML_TYPE_Q6_K:    ftype = LLAMA_FTYPE_MOSTLY_Q6_K;    break;
             case GGML_TYPE_TQ1_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ1_0;   break;
-case GGML_TYPE_TQ2_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ2_0;   break;
-case GGML_TYPE_I2_S:    ftype = LLAMA_FTYPE_MOSTLY_I2_S;    break;
-case GGML_TYPE_IQ2_XXS: ftype = LLAMA_FTYPE_MOSTLY_IQ2_XXS; break;
+            case GGML_TYPE_TQ2_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ2_0;   break;
+            case GGML_TYPE_IQ2_XXS: ftype = LLAMA_FTYPE_MOSTLY_IQ2_XXS; break;
             case GGML_TYPE_IQ2_XS:  ftype = LLAMA_FTYPE_MOSTLY_IQ2_XS;  break;
             case GGML_TYPE_IQ2_S:   ftype = LLAMA_FTYPE_MOSTLY_IQ2_S;   break;
             case GGML_TYPE_IQ3_XXS: ftype = LLAMA_FTYPE_MOSTLY_IQ3_XXS; break;
@@ -1263,17 +1261,3 @@ void llama_model_loader::print_info() const {
         LLAMA_LOG_INFO("%s: file size   = %.2f GiB (%.2f BPW) \n", __func__, n_bytes/1024.0/1024.0/1024.0, n_bytes*8.0/n_elements);
     }
 }
-
-// ADID_ROLLBACK (from adm.exe)
-// SDID_ROLLBACK {
-//   "target_file": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-model-loader.cpp"
-//   "update_script": "adm.exe"
-//   "backup_path": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-model-loader.cpp.backup_20260207T143639_291421"
-//   "created_at": "2026-02-07T06:36:39.308226+00:00"
-//   "backup_hash": "304f119b2a39a1e54fbe5fdc907866e6"
-//   "new_hash": "fbe8cbdf21de3813116db6550439f2f5"
-//   "goal_id": "llama_model_loader_classify_type_i2_s"
-//   "semantics": "Classify GGML_TYPE_I2_S as LLAMA_FTYPE_MOSTLY_I2_S instead of warning 'unknown type i2_s'."
-//   "update_attrs": {"relative_path": "external/bitnet/3rdparty/llama.cpp/src/llama-model-loader.cpp", "update_type": "text", "mode": "replace", "encoding": "utf-8", "find_pattern": null, "find_text": "case GGML_TYPE_TQ1_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ1_0;   break;\n            case GGML_TYPE_TQ2_0:   ftype = LLAMA_FTYPE_MOSTLY_TQ2_0;   break;\n            case GGML_TYPE_IQ2_XXS: ftype = LLAMA_FTYPE_MOSTLY_IQ2_XXS; break;", "replace_present": true}
-//   "restore_cmd": "uv run adm --rollback \"D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-model-loader.cpp\""
-// }

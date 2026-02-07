@@ -150,11 +150,10 @@ extern "C" {
         //LLAMA_FTYPE_MOSTLY_Q4_0_4_8      = 34, // removed from gguf files, use Q4_0 and runtime repack
         //LLAMA_FTYPE_MOSTLY_Q4_0_8_8      = 35, // removed from gguf files, use Q4_0 and runtime repack
         LLAMA_FTYPE_MOSTLY_TQ1_0         = 36, // except 1d tensors
-LLAMA_FTYPE_MOSTLY_TQ2_0         = 37, // except 1d tensors
-LLAMA_FTYPE_MOSTLY_MXFP4_MOE     = 38, // except 1d tensors
-LLAMA_FTYPE_MOSTLY_I2_S          = 40, // except 1d tensors
+        LLAMA_FTYPE_MOSTLY_TQ2_0         = 37, // except 1d tensors
+        LLAMA_FTYPE_MOSTLY_MXFP4_MOE     = 38, // except 1d tensors
 
-LLAMA_FTYPE_GUESSED = 1024, // not specified in the model file
+        LLAMA_FTYPE_GUESSED = 1024, // not specified in the model file
     };
 
     enum llama_rope_scaling_type {
@@ -1566,17 +1565,3 @@ LLAMA_FTYPE_GUESSED = 1024, // not specified in the model file
 #endif
 
 #endif // LLAMA_H
-
-// ADID_ROLLBACK (from adm.exe)
-// SDID_ROLLBACK {
-//   "target_file": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/include/llama.h"
-//   "update_script": "adm.exe"
-//   "backup_path": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/include/llama.h.backup_20260207T143636_956831"
-//   "created_at": "2026-02-07T06:36:37.004351+00:00"
-//   "backup_hash": "10bcb3e14db6c864462f90c40c247621"
-//   "new_hash": "19a02f5fb780e97d7b041cfd38f53d03"
-//   "goal_id": "llama_h_add_ftype_i2_s"
-//   "semantics": "Add LLAMA_FTYPE_MOSTLY_I2_S=40 so GGUF general.file_type=40 is recognized."
-//   "update_attrs": {"relative_path": "external/bitnet/3rdparty/llama.cpp/include/llama.h", "update_type": "text", "mode": "replace", "encoding": "utf-8", "find_pattern": null, "find_text": "LLAMA_FTYPE_MOSTLY_TQ1_0         = 36, // except 1d tensors\n        LLAMA_FTYPE_MOSTLY_TQ2_0         = 37, // except 1d tensors\n        LLAMA_FTYPE_MOSTLY_MXFP4_MOE     = 38, // except 1d tensors\n\n        LLAMA_FTYPE_GUESSED = 1024, // not specified in the model file", "replace_present": true}
-//   "restore_cmd": "uv run adm --rollback \"D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/include/llama.h\""
-// }

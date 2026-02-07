@@ -248,9 +248,9 @@ static ggml_type llama_tensor_get_type(quantize_state_impl & qs, ggml_type new_t
             else if (ftype == LLAMA_FTYPE_MOSTLY_IQ3_XXS) {
                 new_type = GGML_TYPE_IQ3_S;
             }
-            else if (ftype == LLAMA_FTYPE_MOSTLY_TQ1_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_0 || ftype == LLAMA_FTYPE_MOSTLY_I2_S) {
-    new_type = GGML_TYPE_Q4_K;
-}
+            else if (ftype == LLAMA_FTYPE_MOSTLY_TQ1_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_0) {
+                new_type = GGML_TYPE_Q4_K;
+            }
         }
     } else if (ftype == LLAMA_FTYPE_MOSTLY_IQ2_XXS || ftype == LLAMA_FTYPE_MOSTLY_IQ2_XS || ftype == LLAMA_FTYPE_MOSTLY_IQ1_S ||
                ftype == LLAMA_FTYPE_MOSTLY_IQ2_S || ftype == LLAMA_FTYPE_MOSTLY_IQ2_M    || ftype == LLAMA_FTYPE_MOSTLY_IQ1_M) {
@@ -558,10 +558,9 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
         case LLAMA_FTYPE_MOSTLY_Q5_K_S:
         case LLAMA_FTYPE_MOSTLY_Q5_K_M:  default_type = GGML_TYPE_Q5_K;    break;
         case LLAMA_FTYPE_MOSTLY_Q6_K:    default_type = GGML_TYPE_Q6_K;    break;
-case LLAMA_FTYPE_MOSTLY_TQ1_0:   default_type = GGML_TYPE_TQ1_0;   break;
-case LLAMA_FTYPE_MOSTLY_TQ2_0:   default_type = GGML_TYPE_TQ2_0;   break;
-case LLAMA_FTYPE_MOSTLY_I2_S:    default_type = GGML_TYPE_I2_S;    break;
-case LLAMA_FTYPE_MOSTLY_IQ2_XXS: default_type = GGML_TYPE_IQ2_XXS; break;
+        case LLAMA_FTYPE_MOSTLY_TQ1_0:   default_type = GGML_TYPE_TQ1_0;   break;
+        case LLAMA_FTYPE_MOSTLY_TQ2_0:   default_type = GGML_TYPE_TQ2_0;   break;
+        case LLAMA_FTYPE_MOSTLY_IQ2_XXS: default_type = GGML_TYPE_IQ2_XXS; break;
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:  default_type = GGML_TYPE_IQ2_XS;  break;
         case LLAMA_FTYPE_MOSTLY_IQ2_S:   default_type = GGML_TYPE_IQ2_XS;  break;
         case LLAMA_FTYPE_MOSTLY_IQ2_M:   default_type = GGML_TYPE_IQ2_S;   break;
@@ -1071,17 +1070,3 @@ uint32_t llama_model_quantize(
 
     return 0;
 }
-
-// ADID_ROLLBACK (from adm.exe)
-// SDID_ROLLBACK {
-//   "target_file": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-quant.cpp"
-//   "update_script": "adm.exe"
-//   "backup_path": "D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-quant.cpp.backup_20260207T143642_046482"
-//   "created_at": "2026-02-07T06:36:42.060635+00:00"
-//   "backup_hash": "2be9edb722424c482973533de7e39067"
-//   "new_hash": "108b51bc25a2a472ea7920a1ae4ec012"
-//   "goal_id": "llama_quant_default_type_i2_s"
-//   "semantics": "Add default_type mapping for LLAMA_FTYPE_MOSTLY_I2_S -> GGML_TYPE_I2_S."
-//   "update_attrs": {"relative_path": "external/bitnet/3rdparty/llama.cpp/src/llama-quant.cpp", "update_type": "text", "mode": "replace", "encoding": "utf-8", "find_pattern": null, "find_text": "case LLAMA_FTYPE_MOSTLY_Q6_K:    default_type = GGML_TYPE_Q6_K;    break;\n        case LLAMA_FTYPE_MOSTLY_TQ1_0:   default_type = GGML_TYPE_TQ1_0;   break;\n        case LLAMA_FTYPE_MOSTLY_TQ2_0:   default_type = GGML_TYPE_TQ2_0;   break;\n        case LLAMA_FTYPE_MOSTLY_IQ2_XXS: default_type = GGML_TYPE_IQ2_XXS; break;", "replace_present": true}
-//   "restore_cmd": "uv run adm --rollback \"D:\\zPython\\Aurora_Fractal\\external/bitnet/3rdparty/llama.cpp/src/llama-quant.cpp\""
-// }
